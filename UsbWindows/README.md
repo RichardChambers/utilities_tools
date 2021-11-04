@@ -9,6 +9,13 @@ able to interact with a USB device such as a thermal receipt printer or a scale 
 other USB connected serial device that does not create a Virtual Serial Port when
 the USB cable is connected to a Windows PC.
 
+I found the following two articles helpful:
+ - [Code Project: Enumerating windows device](https://www.codeproject.com/Articles/14412/Enumerating-windows-device)
+ - [Peter's blog: Getting a handle on usbprint.sys](https://blog.peter.skarpetis.com/archives/2005/04/07/getting-a-handle-on-usbprintsys/)
+
+See also this Stack Overflow post, [time out for USB ReadFile() replacing Serial Port code used with serial communications device](https://stackoverflow.com/questions/69828681/time-out-for-usb-readfile-replacing-serial-port-code-used-with-serial-communic)
+where I posted a question and an answer along with links to other posts concerning time outs with `ReadFile()`.
+
 ### Basics of the code
 
 Using the Windows API with USB devices for communicating with a serial communications
