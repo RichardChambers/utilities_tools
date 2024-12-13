@@ -1,0 +1,8 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/FileAccessLib/.vs/FileAccessLib/v16
+/.vs
+/FileAccessLib/FileAccessLib/Debug
+/FileAccessLib/Debug
