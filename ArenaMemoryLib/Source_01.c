@@ -1,4 +1,20 @@
-
+// A function library for the simple Arena approach to memory
+// management with the C programming language.
+//
+// This library allows you to create a memory area from which
+// memory areas are allocated. When the memory areas allocated
+// are no longer needed, the entire arena area can be freed.
+//   - ArenaNewArena() allocate a new arena memory area using malloc()
+//   - ArenaFreeArena() free an arena memory area using free()
+//   - ArenaAllocItem() provide a pointer to a section of the arena
+//   - ArenaCloneArena() clone an arena to create a temporary book mark
+//
+// The purpose of the ArenaCloneArena() function is to create a copy of
+// an arena management data when a new scope is being entered so that when
+// the scope is exited, any arena memory allocations done during that scope
+// are rolled back as if they did not happen.
+// 
+// See the test program in Source_02.c for an example.
 
 #define _CRT_SECURE_NO_WARNINGS
 #define _CRTDBG_MAP_ALLOC
@@ -153,6 +169,9 @@ static void * ArenaRemoveFromChain(ArenaPtr x) {
 	return NULL;
 }
 
+// The following function is a provided as part of testing
+// the Arena memory library. It walks the chain of arenas
+// to generate a few statistics.
 struct ArenaWalkData ArenaWalkAndCheckChain(void) {
 	Arena* p = arenaFactory.chainHead;
 	struct ArenaWalkData walk = { 0 };
@@ -167,6 +186,10 @@ struct ArenaWalkData ArenaWalkAndCheckChain(void) {
 	return walk;
 }
 
+// global object containing function pointers to the above
+// functions which are file level scope using static.
+// This allows us to have only a single global visible rather
+// than the several globals of the functions.
 ArenaObject arenaFactory = {
 	NULL,
 	ArenaNewArena,
@@ -177,85 +200,3 @@ ArenaObject arenaFactory = {
 	ArenaRemoveFromChain
 };
 
-
-
-#if 0
-// test harness
-
-static int test_01() {
-	ArenaPtr myArena;
-
-	myArena = arenaFactory.ArenaNewArena(sizeof(int) * 20);
-
-	ArenaAddToChain(myArena);
-
-	int* pInt = arenaFactory.ArenaAllocItem(myArena, sizeof(int) * 30);
-	assert(pInt == NULL);
-
-	pInt = arenaFactory.ArenaAllocItem(myArena, sizeof(int) * 20);
-	assert(pInt);
-
-	struct ArenaWalkData walk = ArenaWalkAndCheckChain();
-
-	return 0;
-}
-
-static void testx(Arena ar) {
-	ArenaPtr myArena = &ar;
-	unsigned long* a = NULL, * b = NULL, * c = NULL, * d = NULL;
-
-	a = arenaFactory.ArenaAllocItem(myArena, sizeof(unsigned long));
-	b = arenaFactory.ArenaAllocItem(myArena, sizeof(unsigned long));
-	c = arenaFactory.ArenaAllocItem(myArena, sizeof(unsigned long));
-	d = arenaFactory.ArenaAllocItem(myArena, sizeof(unsigned long));
-}
-
-int main_source_03() {
-	ArenaPtr myArena;
-	
-	myArena = arenaFactory.ArenaNewArena(4096);
-
-	ArenaAddToChain(myArena);
-
-	test_01();
-
-	unsigned long* a = NULL, * b = NULL, * c = NULL, * d = NULL;
-
-	a = arenaFactory.ArenaAllocItem(myArena, sizeof(unsigned long));
-	b = arenaFactory.ArenaAllocItem(myArena, sizeof(unsigned long));
-	c = arenaFactory.ArenaAllocItem(myArena, sizeof(unsigned long));
-	d = arenaFactory.ArenaAllocItem(myArena, sizeof(unsigned long));
-
-//	unsigned char* bad = ArenaAllocItem(myArena, 4096);
-
-	{
-		// clone the current arena to create a bench mark and then use
-		// the clone for temporary storage which is then discarded
-		// once we exit the scope of these braces.
-		Arena ar = arenaFactory.ArenaCloneArena(myArena);
-		ArenaPtr arPtr = &ar;
-
-		unsigned long* a = NULL, * b = NULL, * c = NULL, * d = NULL;
-
-		a = arenaFactory.ArenaAllocItem(arPtr, sizeof(unsigned long));
-		b = arenaFactory.ArenaAllocItem(arPtr, sizeof(unsigned long));
-		c = arenaFactory.ArenaAllocItem(arPtr, sizeof(unsigned long));
-		d = arenaFactory.ArenaAllocItem(arPtr, sizeof(unsigned long));
-
-		struct ArenaWalkData walk = ArenaWalkAndCheckChain();
-
-		testx(ar);
-	}
-
-	testx(arenaFactory.ArenaCloneArena(myArena));
-
-	struct ArenaWalkData walk = ArenaWalkAndCheckChain();
-
-	arenaFactory.ArenaFreeArena(ArenaRemoveFromChain(myArena));
-
-	walk = ArenaWalkAndCheckChain();
-
-	return 0;
-}
-
-#endif
