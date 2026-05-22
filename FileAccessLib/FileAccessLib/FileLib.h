@@ -12,6 +12,20 @@
 	
 **/
 
+#pragma once
+
+// Following creates a macro to use with #pragma to generate
+// a note in the Output listing containing a link to the line
+// generating the message.
+
+#define PRAGMA_NOTE_STRING2(x) #x
+#define PRAGMA_NOTE_STRING(x) PRAGMA_NOTE_STRING2(x)
+#define PRAGMA_NOTE(msg) message(__FILE__ "(" PRAGMA_NOTE_STRING(__LINE__) "): Note: " msg)
+
+#if defined(_CRT_SECURE_NO_WARNINGS)
+#pragma PRAGMA_NOTE("_CRT_SECURE_NO_WARNINGS is enabled to suppress warnings to use secure functions.")
+#endif
+
 // struct for use with function FileLibReadHeader() to allow user of this library to request
 // some of the file management data from a file.  The user can not use this to change the
 // file management data, only to inspect the data.
