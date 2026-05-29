@@ -274,6 +274,7 @@ int FileLibCreate (char *aszFileName, int nRecords, int nIndexSize, int nRecordS
 			tempbufIndex.nRecordBlockNumber++;
 		}
 		ioStatus = fclose (hFile);
+		assert(ioStatus == 0);
 		iStatus = 1;       // indicate we were successful
 	}
 
@@ -334,6 +335,7 @@ int FileLibReadHeader (char *aszFileName, void *pHeader, FileLibFileInfo *pFileI
 	if (hFile) {
 		iStatus = FileLibReadHeaderFh (hFile, pHeader, pFileInfo);
 		ioStatus = fclose (hFile);
+		assert(ioStatus == 0);
 	}
 
 	return iStatus;
@@ -384,6 +386,7 @@ int FileLibWriteHeader (char *aszFileName, void *pHeader)
 	if (hFile) {
 		iStatus = FileLibWriteHeaderFh (hFile, pHeader);
 		ioStatus = fclose (hFile);
+		assert(ioStatus == 0);
 	}
 
 	return iStatus;
@@ -526,6 +529,7 @@ int FileLibInsert (char *aszFileName, void *pIndex, void *pRecord, int (*pFunc)(
 	if (hFile) {
 		iStatus = FileLibInsertFh (hFile, pIndex, pRecord, pFunc);
 		ioStatus = fclose (hFile);
+		assert(ioStatus == 0);
 	}
 
 	return iStatus;
@@ -589,6 +593,7 @@ int FileLibRetrieve (char *aszFileName, void *pIndex, void *pRecord, int (*pFunc
 	if (hFile) {
 		iStatus = FileLibRetrieveFh (hFile, pIndex, pRecord, pFunc);
 		ioStatus = fclose (hFile);
+		assert(ioStatus == 0);
 	}
 
 	return iStatus;
@@ -651,6 +656,7 @@ int FileLibIterate (char *aszFileName, FileLibIterator *pIterator, void *pIndex,
 	if (hFile) {
 		iStatus = FileLibIterateFh (hFile, pIterator, pIndex, pRecord, pFunc);
 		ioStatus = fclose (hFile);
+		assert(ioStatus == 0);
 	}
 
 	return iStatus;
@@ -772,6 +778,7 @@ int FileLibDelete (char *aszFileName, void *pIndex, int (*pFunc)(void *pIndex1, 
 	if (hFile) {
 		iStatus = FileLibDeleteFh (hFile, pIndex, pFunc);
 		ioStatus = fclose (hFile);
+		assert(ioStatus == 0);
 	}
 
 	return iStatus;
@@ -843,6 +850,7 @@ int FileLibUpdate (char *aszFileName, void *pIndex, void *pRecord, int (*pFunc)(
 	if (hFile) {
 		iStatus = FileLibUpdateFh (hFile, pIndex, pRecord, pFunc);
 		ioStatus = fclose (hFile);
+		assert(ioStatus == 0);
 	}
 	return iStatus;
 }
@@ -867,6 +875,7 @@ int FileLibCheckFile (char *aszFileName, FileLibFileCheckBuffer *aCheckBuf, int 
 		if (MyFileHeader.ulSignature1 != FileLibFileSignature || MyFileHeader.ulSignature2 != FileLibFileSignature) {
 			printf (" File Signature is invalid.\n");
 			ioStatus = fclose (hFile);
+			assert(ioStatus == 0);
 			return -1;
 		}
 
@@ -899,6 +908,7 @@ int FileLibCheckFile (char *aszFileName, FileLibFileCheckBuffer *aCheckBuf, int 
 		}
 
 		ioStatus = fclose (hFile);
+		assert(ioStatus == 0);
 	}
 
 	return 0;
