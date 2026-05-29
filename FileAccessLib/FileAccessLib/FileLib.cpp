@@ -21,6 +21,7 @@
 // memory.h file must also be included.
 #include <stdio.h>
 #include <memory.h>
+#include <assert.h>
 
 // include the function prototypes and exported data types that these functions use
 // to allow compiler to check interfaces.
@@ -82,11 +83,14 @@ long FileLibSearch (FILE *hFile, void *pIndex, long *pnRecordBlockNumber, int (*
 	FileLibHeader  MyFileHeader;
 	FileLibIndex   MyIndex;
 	long           nIndexBlockNumber = 1;
+	int            ioStatus = 0;
+	size_t         ioLength = 0;
 
 	// read in the file header so that we have the various sizing data we
 	// need for our file offset calculations.
-	fseek (hFile, 0, SEEK_SET);
-	fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
+	ioStatus = fseek (hFile, 0, SEEK_SET);
+	assert(ioStatus == 0);
+	ioLength = fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
 
 	// Check the signatures to determine if this file has been initialized properly.
 	// If signatures do not check out then we can not depend on file having proper management data.
@@ -123,8 +127,9 @@ long FileLibSearch (FILE *hFile, void *pIndex, long *pnRecordBlockNumber, int (*
 	// into the memory buffer then just do sequential search otherwise do a binary search.
 	while (nIndexBlockNumberMax - nIndexBlockNumberMin >= nCountIndexSequentialSearchBuffer) {
 		nIndexBlockNumber = ((nIndexBlockNumberMax - nIndexBlockNumberMin) / 2) + nIndexBlockNumberMin;
-		fseek (hFile, (nIndexBlockNumber - 1)*MyFileHeader.nStoredIndexSize + nOffsetIndex, SEEK_SET);
-		fread (&MyIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
+		ioStatus = fseek (hFile, (nIndexBlockNumber - 1)*MyFileHeader.nStoredIndexSize + nOffsetIndex, SEEK_SET);
+		assert(ioStatus == 0);
+		ioLength = fread (&MyIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
 		iCmp = pFunc (pIndex, MyIndex.uchIndex);
 		if (iCmp == 0) {
 			// found the index so lets return the index number if the caller has
@@ -147,8 +152,9 @@ long FileLibSearch (FILE *hFile, void *pIndex, long *pnRecordBlockNumber, int (*
 
 	// We have not found the index while doing the binary search and are now within the range that
 	// we will change from the binary search to just a straight sequential search.  
-	fseek (hFile, (nIndexBlockNumberMin - 1)*MyFileHeader.nStoredIndexSize + nOffsetIndex, SEEK_SET);
-	fread (IndexSequentialSearchBuffer, MyFileHeader.nStoredIndexSize, nCountIndexSequentialSearchBuffer, hFile);
+	ioStatus = fseek (hFile, (nIndexBlockNumberMin - 1)*MyFileHeader.nStoredIndexSize + nOffsetIndex, SEEK_SET);
+	assert(ioStatus == 0);
+	ioLength = fread (IndexSequentialSearchBuffer, MyFileHeader.nStoredIndexSize, nCountIndexSequentialSearchBuffer, hFile);
 	FileLibIndex  *pMyIndex = (FileLibIndex *)&IndexSequentialSearchBuffer[0];
 	iCmp = -1;
 	for (nIndexBlockNumber = nIndexBlockNumberMin; nIndexBlockNumber <= nIndexBlockNumberMax; nIndexBlockNumber++) {
@@ -235,17 +241,21 @@ int FileLibCreate (char *aszFileName, int nRecords, int nIndexSize, int nRecordS
 	FileLibRecordOffset nOffsetRecords = nOffsetIndex + MyFileHeader.nIndexSize * MyFileHeader.nMaxRecords;
 
 	if (hFile) {
+		int            ioStatus = 0;
+		size_t         ioLength = 0;
+
 		// create a temporary user header area, zero it out for use when we init the
 		// file.  we are only going to init the file management header area, the user
 		// header area, and the index area of the file.  The record area will be filled
 		// in as records are actually added.
-		fseek (hFile, 0, SEEK_SET);
-		fwrite (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
+		ioStatus = fseek (hFile, 0, SEEK_SET);
+		assert(ioStatus == 0);
+		ioLength = fwrite (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
 
 		unsigned char   tempbuf[512];
 		memset (tempbuf, 0, sizeof(tempbuf));
 		if (nHeaderSize > 0)
-			fwrite (tempbuf, nHeaderSize, 1, hFile);
+			ioLength = fwrite (tempbuf, nHeaderSize, 1, hFile);
 
 		// Now we will initialize the index area of the file.  Each index that is stored has two
 		// parts, the physical file record block index number which is not seen by the user of
@@ -256,13 +266,14 @@ int FileLibCreate (char *aszFileName, int nRecords, int nIndexSize, int nRecordS
 		// index as well as the data associated with the index.
 		memset (&tempbufIndex, 0, sizeof(tempbufIndex));
 
-		fseek (hFile, nOffsetIndex, SEEK_SET);
+		ioStatus = fseek (hFile, nOffsetIndex, SEEK_SET);
+		assert(ioStatus == 0);
 		tempbufIndex.nRecordBlockNumber = 1;
 		for (long iLoop = 1; iLoop <= MyFileHeader.nMaxRecords; iLoop++) {
-			fwrite (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
+			ioLength = fwrite (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
 			tempbufIndex.nRecordBlockNumber++;
 		}
-		fclose (hFile);
+		ioStatus = fclose (hFile);
 		iStatus = 1;       // indicate we were successful
 	}
 
@@ -283,9 +294,12 @@ int FileLibReadHeaderFh (FILE *hFile, void *pHeader, FileLibFileInfo *pFileInfo)
 {
 	FileLibHeader  MyFileHeader;
 	int            iStatus = 0;    // assume not successful
+	int            ioStatus = 0;
+	size_t         ioLength = 0;
 
-	fseek (hFile, 0, SEEK_SET);
-	fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
+	ioStatus = fseek (hFile, 0, SEEK_SET);
+	assert(ioStatus == 0);
+	ioLength = fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
 
 	// Check the signatures to determine if this file has been initialized properly.
 	// If signatures do not check out then we can not depend on file having proper management data.
@@ -301,7 +315,7 @@ int FileLibReadHeaderFh (FILE *hFile, void *pHeader, FileLibFileInfo *pFileInfo)
 
 		if (pHeader && MyFileHeader.nHeaderSize > 0) {
 			iStatus = 1;    // indicate success
-			fread (pHeader, MyFileHeader.nHeaderSize, 1, hFile);
+			ioLength = fread (pHeader, MyFileHeader.nHeaderSize, 1, hFile);
 		}
 	} else {
 		iStatus = FileLibStatus_FileInvalid;
@@ -313,12 +327,13 @@ int FileLibReadHeaderFh (FILE *hFile, void *pHeader, FileLibFileInfo *pFileInfo)
 int FileLibReadHeader (char *aszFileName, void *pHeader, FileLibFileInfo *pFileInfo)
 {
 	int  iStatus = FileLibStatus_FileNotFound;
+	int            ioStatus = 0;
 
 	FILE *hFile = fopen (aszFileName, "rb");
 
 	if (hFile) {
 		iStatus = FileLibReadHeaderFh (hFile, pHeader, pFileInfo);
-		fclose (hFile);
+		ioStatus = fclose (hFile);
 	}
 
 	return iStatus;
@@ -336,17 +351,21 @@ int FileLibWriteHeaderFh (FILE *hFile, void *pHeader)
 {
 	FileLibHeader  MyFileHeader;
 	int            iStatus = 0;    // assume not successful
+	int            ioStatus = 0;
+	size_t         ioLength = 0;
 
-	fseek (hFile, 0, SEEK_SET);
-	fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
+	ioStatus = fseek (hFile, 0, SEEK_SET);
+	assert(ioStatus == 0);
+	ioLength = fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
 
 	// Check the signatures to determine if this file has been initialized properly.
 	// If signatures do not check out then we can not depend on file having proper management data.
 	if (MyFileHeader.ulSignature1 == FileLibFileSignature && MyFileHeader.ulSignature2 == FileLibFileSignature) {
 		if (pHeader && MyFileHeader.nHeaderSize > 0) {
 			iStatus = 1;    // indicate success
-			fseek (hFile, sizeof(FileLibHeader), SEEK_SET);
-			fwrite (pHeader, MyFileHeader.nHeaderSize, 1, hFile);
+			ioStatus = fseek (hFile, sizeof(FileLibHeader), SEEK_SET);
+			assert(ioStatus == 0);
+			ioLength = fwrite (pHeader, MyFileHeader.nHeaderSize, 1, hFile);
 		}
 	} else {
 		iStatus = FileLibStatus_FileInvalid;
@@ -358,12 +377,13 @@ int FileLibWriteHeaderFh (FILE *hFile, void *pHeader)
 int FileLibWriteHeader (char *aszFileName, void *pHeader)
 {
 	int  iStatus = FileLibStatus_FileNotFound;
+	int            ioStatus = 0;
 
 	FILE *hFile = fopen (aszFileName, "r+b");
 
 	if (hFile) {
 		iStatus = FileLibWriteHeaderFh (hFile, pHeader);
-		fclose (hFile);
+		ioStatus = fclose (hFile);
 	}
 
 	return iStatus;
@@ -374,12 +394,15 @@ int FileLibInsertFh (FILE *hFile, void *pIndex, void *pRecord, int (*pFunc)(void
 {
 	int            iStatus = FileLibStatus_FileNotFound;   // default is to indicate an error
 	FileLibHeader  MyFileHeader;
+	int            ioStatus = 0;
+	size_t         ioLength = 0;
 
 	iStatus = 0;    // indicate that we were able to open the file though not yet an insert
 
 	// Read the file header which contains the management data
-	fseek (hFile, 0, SEEK_SET);
-	fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
+	ioStatus = fseek (hFile, 0, SEEK_SET);
+	assert(ioStatus == 0);
+	ioLength = fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
 
 	// Check the signatures to determine if this file has been initialized properly.
 	// If signatures do not check out then we can not depend on file having proper management data.
@@ -415,8 +438,9 @@ int FileLibInsertFh (FILE *hFile, void *pIndex, void *pRecord, int (*pFunc)(void
 		// read the index entry that contains the record block index we are going to use to
 		// store the data associated with the new index that we are inserting.
 		FileLibIndex   tempbufIndexNew;
-		fseek (hFile, nOffsetLast, SEEK_SET);
-		fread (&tempbufIndexNew, MyFileHeader.nStoredIndexSize, 1, hFile);
+		ioStatus = fseek (hFile, nOffsetLast, SEEK_SET);
+		assert(ioStatus == 0);
+		ioLength = fread (&tempbufIndexNew, MyFileHeader.nStoredIndexSize, 1, hFile);
 
 		if (nBlockNumber <= MyFileHeader.nRecordCount) {
 			// we need to insert this new index into the list of indexes so
@@ -425,10 +449,12 @@ int FileLibInsertFh (FILE *hFile, void *pIndex, void *pRecord, int (*pFunc)(void
 #if defined(RECORD_AT_TIME)
 			nOffsetLast -= MyFileHeader.nStoredIndexSize;
 			while (nOffsetLast >= nOffsetInsert) {
-				fseek (hFile, nOffsetLast, SEEK_SET);
-				fread (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
-				fseek (hFile, nOffsetLast+MyFileHeader.nStoredIndexSize, SEEK_SET);
-				fwrite (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
+				ioStatus = fseek (hFile, nOffsetLast, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fread (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
+				ioStatus = fseek (hFile, nOffsetLast+MyFileHeader.nStoredIndexSize, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fwrite (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
 				nOffsetLast -= MyFileHeader.nStoredIndexSize;
 			}
 #else
@@ -443,39 +469,47 @@ int FileLibInsertFh (FILE *hFile, void *pIndex, void *pRecord, int (*pFunc)(void
 
 			while (nOffsetLast > nOffsetInsert + nInsertWindowSize) {
 				nOffsetLast -= nInsertWindowSize;
-				fseek (hFile, nOffsetLast, SEEK_SET);
-				fread (uchInsertBuffer, nInsertWindowSize, 1, hFile);
-				fseek (hFile, nOffsetLast + MyFileHeader.nStoredIndexSize, SEEK_SET);
-				fwrite (uchInsertBuffer, nInsertWindowSize, 1, hFile);
+				ioStatus = fseek (hFile, nOffsetLast, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fread (uchInsertBuffer, nInsertWindowSize, 1, hFile);
+				ioStatus = fseek (hFile, nOffsetLast + MyFileHeader.nStoredIndexSize, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fwrite (uchInsertBuffer, nInsertWindowSize, 1, hFile);
 			}
 
 			if (nOffsetLast > nOffsetInsert) {
 				nInsertWindowSize = nOffsetLast - nOffsetInsert;
-				fseek (hFile, nOffsetInsert, SEEK_SET);
-				fread (uchInsertBuffer, nInsertWindowSize, 1, hFile);
-				fseek (hFile, nOffsetInsert + MyFileHeader.nStoredIndexSize, SEEK_SET);
-				fwrite (uchInsertBuffer, nInsertWindowSize, 1, hFile);
+				ioStatus = fseek (hFile, nOffsetInsert, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fread (uchInsertBuffer, nInsertWindowSize, 1, hFile);
+				ioStatus = fseek (hFile, nOffsetInsert + MyFileHeader.nStoredIndexSize, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fwrite (uchInsertBuffer, nInsertWindowSize, 1, hFile);
 			}
 #endif
 		}
 
 		// we put the new index into this location in the index area of the file.
 		memmove (tempbufIndexNew.uchIndex, pIndex, MyFileHeader.nIndexSize);
-		fseek (hFile, nOffsetInsert, SEEK_SET);
-		fwrite (&tempbufIndexNew, MyFileHeader.nStoredIndexSize, 1, hFile);
+		ioStatus = fseek (hFile, nOffsetInsert, SEEK_SET);
+		assert(ioStatus == 0);
+		ioLength = fwrite (&tempbufIndexNew, MyFileHeader.nStoredIndexSize, 1, hFile);
 		MyFileHeader.nRecordCount++;
 
 		if (pRecord && MyFileHeader.nRecordSize > 0) {
 			nOffsetInsert = MyFileHeader.ulRecordAreaOffset + (tempbufIndexNew.nRecordBlockNumber - 1) * MyFileHeader.nRecordSize;
-			fseek (hFile, nOffsetInsert, SEEK_SET);
-			fwrite (pRecord, MyFileHeader.nRecordSize, 1, hFile);
+			ioStatus = fseek (hFile, nOffsetInsert, SEEK_SET);
+			assert(ioStatus == 0);
+			ioLength = fwrite (pRecord, MyFileHeader.nRecordSize, 1, hFile);
 		}
 		iStatus = 1;
 
 		// Update the file header data and then lets flush the file changes to disk.
-		fseek (hFile, 0, SEEK_SET);
-		fwrite (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
-		fflush (hFile);
+		ioStatus = fseek (hFile, 0, SEEK_SET);
+		assert(ioStatus == 0);
+		ioLength = fwrite (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
+		ioStatus = fflush (hFile);
+		assert(ioStatus == 0);
 	}
 
 	return iStatus;
@@ -485,12 +519,13 @@ int FileLibInsertFh (FILE *hFile, void *pIndex, void *pRecord, int (*pFunc)(void
 int FileLibInsert (char *aszFileName, void *pIndex, void *pRecord, int (*pFunc)(void *pIndex1, void *pIndex2))
 {
 	int   iStatus = FileLibStatus_FileNotFound;   // default is to indicate an error
+	int            ioStatus = 0;
 
 	FILE  *hFile = fopen (aszFileName, "r+b");
 
 	if (hFile) {
 		iStatus = FileLibInsertFh (hFile, pIndex, pRecord, pFunc);
-		fclose (hFile);
+		ioStatus = fclose (hFile);
 	}
 
 	return iStatus;
@@ -502,9 +537,12 @@ int FileLibRetrieveFh (FILE *hFile, void *pIndex, void *pRecord, int (*pFunc)(vo
 	FileLibHeader  MyFileHeader;
 	long           nRecordBlockNumber;
 	int            iStatus = FileLibStatus_FileNotFound;
+	int            ioStatus = 0;
+	size_t         ioLength = 0;
 
-	fseek (hFile, 0, SEEK_SET);
-	fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
+	ioStatus = fseek (hFile, 0, SEEK_SET);
+	assert(ioStatus == 0);
+	ioLength = fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
 
 	// Check the signatures to determine if this file has been initialized properly.
 	// If signatures do not check out then we can not depend on file having proper management data.
@@ -519,14 +557,16 @@ int FileLibRetrieveFh (FILE *hFile, void *pIndex, void *pRecord, int (*pFunc)(vo
 			FileLibIndex   tempbufIndex;
 			FileLibRecordOffset nOffsetDelta = (iBlock - 1) * MyFileHeader.nStoredIndexSize;
 
-			fseek (hFile, nOffsetIndex + nOffsetDelta, SEEK_SET);
-			fread (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
+			ioStatus = fseek (hFile, nOffsetIndex + nOffsetDelta, SEEK_SET);
+			assert(ioStatus == 0);
+			ioLength = fread (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
 			memmove (pIndex, tempbufIndex.uchIndex, MyFileHeader.nIndexSize);
 
 			if (pRecord && MyFileHeader.nRecordSize > 0) {
 				nOffsetDelta = (tempbufIndex.nRecordBlockNumber - 1) * MyFileHeader.nRecordSize;
-				fseek (hFile, MyFileHeader.ulRecordAreaOffset + nOffsetDelta, SEEK_SET);
-				fread (pRecord, MyFileHeader.nRecordSize, 1, hFile);
+				ioStatus = fseek (hFile, MyFileHeader.ulRecordAreaOffset + nOffsetDelta, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fread (pRecord, MyFileHeader.nRecordSize, 1, hFile);
 			}
 			iStatus = 1;
 		} else {
@@ -542,12 +582,13 @@ int FileLibRetrieveFh (FILE *hFile, void *pIndex, void *pRecord, int (*pFunc)(vo
 int FileLibRetrieve (char *aszFileName, void *pIndex, void *pRecord, int (*pFunc)(void *pIndex1, void *pIndex2))
 {
 	int   iStatus = FileLibStatus_FileNotFound;
+	int            ioStatus = 0;
 
 	FILE  *hFile = fopen (aszFileName, "r+b");
 
 	if (hFile) {
 		iStatus = FileLibRetrieveFh (hFile, pIndex, pRecord, pFunc);
-		fclose (hFile);
+		ioStatus = fclose (hFile);
 	}
 
 	return iStatus;
@@ -558,9 +599,12 @@ int FileLibIterateFh (FILE *hFile, FileLibIterator *pIterator, void *pIndex, voi
 {
 	FileLibHeader  MyFileHeader;
 	int            iStatus = FileLibStatus_FileNotFound;
+	int            ioStatus = 0;
+	size_t         ioLength = 0;
 
-	fseek (hFile, 0, SEEK_SET);
-	fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
+	ioStatus = fseek (hFile, 0, SEEK_SET);
+	assert(ioStatus == 0);
+	ioLength = fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
 
 	// Check the signatures to determine if this file has been initialized properly.
 	// If signatures do not check out then we can not depend on file having proper management data.
@@ -573,15 +617,17 @@ int FileLibIterateFh (FILE *hFile, FileLibIterator *pIterator, void *pIndex, voi
 			FileLibIndex   tempbufIndex;
 			FileLibRecordOffset nOffsetDelta = (pIterator->nIndexNumber - 1) * MyFileHeader.nStoredIndexSize;
 
-			fseek (hFile, nOffsetIndex + nOffsetDelta, SEEK_SET);
-			fread (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
+			ioStatus = fseek (hFile, nOffsetIndex + nOffsetDelta, SEEK_SET);
+			assert(ioStatus == 0);
+			ioLength = fread (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
 			if (pFunc (tempbufIndex.uchIndex, pIndex) == 0) {
 				memmove (pIndex, tempbufIndex.uchIndex, MyFileHeader.nIndexSize);
 
 				if (pRecord && MyFileHeader.nRecordSize > 0) {
 					nOffsetDelta = (tempbufIndex.nRecordBlockNumber - 1) * MyFileHeader.nRecordSize;
-					fseek (hFile, MyFileHeader.ulRecordAreaOffset + nOffsetDelta, SEEK_SET);
-					fread (pRecord, MyFileHeader.nRecordSize, 1, hFile);
+					ioStatus = fseek (hFile, MyFileHeader.ulRecordAreaOffset + nOffsetDelta, SEEK_SET);
+					assert(ioStatus == 0);
+					ioLength = fread (pRecord, MyFileHeader.nRecordSize, 1, hFile);
 				}
 				iStatus = 1;
 				break;
@@ -598,12 +644,13 @@ int FileLibIterateFh (FILE *hFile, FileLibIterator *pIterator, void *pIndex, voi
 int FileLibIterate (char *aszFileName, FileLibIterator *pIterator, void *pIndex, void *pRecord, int (*pFunc)(void *pIndex1, void *pIndex2))
 {
 	int   iStatus = FileLibStatus_FileNotFound;
+	int            ioStatus = 0;
 
 	FILE  *hFile = fopen (aszFileName, "r+b");
 
 	if (hFile) {
 		iStatus = FileLibIterateFh (hFile, pIterator, pIndex, pRecord, pFunc);
-		fclose (hFile);
+		ioStatus = fclose (hFile);
 	}
 
 	return iStatus;
@@ -613,9 +660,12 @@ int FileLibDeleteFh (FILE *hFile, void *pIndex, int (*pFunc)(void *pIndex1, void
 {
 	FileLibHeader  MyFileHeader;
 	int            iStatus = 0;
+	int            ioStatus = 0;
+	size_t         ioLength = 0;
 
-	fseek (hFile, 0, SEEK_SET);
-	fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
+	ioStatus = fseek (hFile, 0, SEEK_SET);
+	assert(ioStatus == 0);
+	ioLength = fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
 
 	// Check the signatures to determine if this file has been initialized properly.
 	// If signatures do not check out then we can not depend on file having proper management data.
@@ -647,18 +697,21 @@ int FileLibDeleteFh (FILE *hFile, void *pIndex, int (*pFunc)(void *pIndex1, void
 			// associated record which is file content management data we want to keep intact, we
 			// will just make a copy of this index and then put it at the end of the index area
 			// of the file once we have moved the remaining indices down.
-			fseek (hFile, nOffsetDelete, SEEK_SET);
-			fread (&tempbufIndexDeleted, MyFileHeader.nStoredIndexSize, 1, hFile);
+			ioStatus = fseek (hFile, nOffsetDelete, SEEK_SET);
+			assert(ioStatus == 0);
+			ioLength = fread (&tempbufIndexDeleted, MyFileHeader.nStoredIndexSize, 1, hFile);
 			memset (tempbufIndexDeleted.uchIndex, 0, sizeof(tempbufIndexDeleted.uchIndex));
 
 #if defined(RECORD_AT_TIME)
 			FileLibRecordOffset nOffsetLast = nOffsetIndex + (MyFileHeader.nRecordCount - 1) * MyFileHeader.nStoredIndexSize;
 
 			while (nOffsetLast > nOffsetDelete) {
-				fseek (hFile, nOffsetDelete+MyFileHeader.nStoredIndexSize, SEEK_SET);
-				fread (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
-				fseek (hFile, nOffsetDelete, SEEK_SET);
-				fwrite (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
+				ioStatus = fseek (hFile, nOffsetDelete+MyFileHeader.nStoredIndexSize, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fread (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
+				ioStatus = fseek (hFile, nOffsetDelete, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fwrite (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
 				nOffsetDelete += MyFileHeader.nStoredIndexSize;
 			}
 #else
@@ -673,29 +726,36 @@ int FileLibDeleteFh (FILE *hFile, void *pIndex, int (*pFunc)(void *pIndex1, void
 
 			FileLibRecordOffset nOffsetLast = nOffsetIndex + (MyFileHeader.nRecordCount - 1) * MyFileHeader.nStoredIndexSize;
 			while (nOffsetLast >= nOffsetDelete + nDeleteWindowSize) {
-				fseek (hFile, nOffsetDelete + MyFileHeader.nStoredIndexSize, SEEK_SET);
-				fread (uchDeleteBuffer, nDeleteWindowSize, 1, hFile);
-				fseek (hFile, nOffsetDelete, SEEK_SET);
-				fwrite (uchDeleteBuffer, nDeleteWindowSize, 1, hFile);
+				ioStatus = fseek (hFile, nOffsetDelete + MyFileHeader.nStoredIndexSize, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fread (uchDeleteBuffer, nDeleteWindowSize, 1, hFile);
+				ioStatus = fseek (hFile, nOffsetDelete, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fwrite (uchDeleteBuffer, nDeleteWindowSize, 1, hFile);
 				nOffsetDelete += nDeleteWindowSize;
 			}
 
 			if (nOffsetLast > nOffsetDelete) {
 				nDeleteWindowSize = nOffsetLast - nOffsetDelete + MyFileHeader.nStoredIndexSize;
-				fseek (hFile, nOffsetDelete + MyFileHeader.nStoredIndexSize, SEEK_SET);
-				fread (uchDeleteBuffer, nDeleteWindowSize, 1, hFile);
-				fseek (hFile, nOffsetDelete, SEEK_SET);
-				fwrite (uchDeleteBuffer, nDeleteWindowSize, 1, hFile);
+				ioStatus = fseek (hFile, nOffsetDelete + MyFileHeader.nStoredIndexSize, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fread (uchDeleteBuffer, nDeleteWindowSize, 1, hFile);
+				ioStatus = fseek (hFile, nOffsetDelete, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fwrite (uchDeleteBuffer, nDeleteWindowSize, 1, hFile);
 			}
 #endif
-			fseek (hFile, nOffsetLast, SEEK_SET);
-			fwrite (&tempbufIndexDeleted, MyFileHeader.nStoredIndexSize, 1, hFile);
+			ioStatus = fseek (hFile, nOffsetLast, SEEK_SET);
+			assert(ioStatus == 0);
+			ioLength = fwrite (&tempbufIndexDeleted, MyFileHeader.nStoredIndexSize, 1, hFile);
 			MyFileHeader.nRecordCount--;
 
 			// Update the file header data and then lets flush the file changes to disk.
-			fseek (hFile, 0, SEEK_SET);
-			fwrite (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
-			fflush (hFile);
+			ioStatus = fseek (hFile, 0, SEEK_SET);
+			assert(ioStatus == 0);
+			ioLength = fwrite (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
+			ioStatus = fflush (hFile);
+			assert(ioStatus == 0);
 			iStatus = 1;    // indicate success
 		}
 	}
@@ -705,12 +765,13 @@ int FileLibDeleteFh (FILE *hFile, void *pIndex, int (*pFunc)(void *pIndex1, void
 int FileLibDelete (char *aszFileName, void *pIndex, int (*pFunc)(void *pIndex1, void *pIndex2))
 {
 	int   iStatus = FileLibStatus_FileNotFound;
+	int            ioStatus = 0;
 
 	FILE  *hFile = fopen (aszFileName, "r+b");
 
 	if (hFile) {
 		iStatus = FileLibDeleteFh (hFile, pIndex, pFunc);
-		fclose (hFile);
+		ioStatus = fclose (hFile);
 	}
 
 	return iStatus;
@@ -721,9 +782,12 @@ int FileLibUpdateFh (FILE *hFile, void *pIndex, void *pRecord, int (*pFunc)(void
 	FileLibHeader  MyFileHeader;
 	long           nRecordBlockNumber;
 	int            iStatus = 0;
+	int            ioStatus = 0;
+	size_t         ioLength = 0;
 
-	fseek (hFile, 0, SEEK_SET);
-	fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
+	ioStatus = fseek (hFile, 0, SEEK_SET);
+	assert(ioStatus == 0);
+	ioLength = fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
 
 	// Check the signatures to determine if this file has been initialized properly.
 	// If signatures do not check out then we can not depend on file having proper management data.
@@ -744,18 +808,22 @@ int FileLibUpdateFh (FILE *hFile, void *pIndex, void *pRecord, int (*pFunc)(void
 			FileLibIndex   tempbufIndex;
 			FileLibRecordOffset nOffsetDelta = (iBlock - 1) * MyFileHeader.nStoredIndexSize;
 
-			fseek (hFile, nOffsetIndex + nOffsetDelta, SEEK_SET);
-			fread (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
+			ioStatus = fseek (hFile, nOffsetIndex + nOffsetDelta, SEEK_SET);
+			assert(ioStatus == 0);
+			ioLength = fread (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
 			memmove (tempbufIndex.uchIndex, pIndex, MyFileHeader.nIndexSize);
-			fseek (hFile, nOffsetIndex + nOffsetDelta, SEEK_SET);
-			fwrite (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
+			ioStatus = fseek (hFile, nOffsetIndex + nOffsetDelta, SEEK_SET);
+			assert(ioStatus == 0);
+			ioLength = fwrite (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
 
 			if (pRecord && MyFileHeader.nRecordSize > 0) {
 				nOffsetDelta = (tempbufIndex.nRecordBlockNumber - 1) * MyFileHeader.nRecordSize;
-				fseek (hFile, MyFileHeader.ulRecordAreaOffset + nOffsetDelta, SEEK_SET);
-				fwrite (pRecord, MyFileHeader.nRecordSize, 1, hFile);
+				ioStatus = fseek (hFile, MyFileHeader.ulRecordAreaOffset + nOffsetDelta, SEEK_SET);
+				assert(ioStatus == 0);
+				ioLength = fwrite (pRecord, MyFileHeader.nRecordSize, 1, hFile);
 			}
-			fflush (hFile);
+			ioStatus = fflush (hFile);
+			assert(ioStatus == 0);
 			iStatus = 1;      // indicate success
 		}
 	} else {
@@ -768,12 +836,13 @@ int FileLibUpdateFh (FILE *hFile, void *pIndex, void *pRecord, int (*pFunc)(void
 int FileLibUpdate (char *aszFileName, void *pIndex, void *pRecord, int (*pFunc)(void *pIndex1, void *pIndex2))
 {
 	int  iStatus = FileLibStatus_FileNotFound;
+	int            ioStatus = 0;
 
 	FILE  *hFile = fopen (aszFileName, "r+b");
 
 	if (hFile) {
 		iStatus = FileLibUpdateFh (hFile, pIndex, pRecord, pFunc);
-		fclose (hFile);
+		ioStatus = fclose (hFile);
 	}
 	return iStatus;
 }
@@ -783,28 +852,32 @@ int FileLibCheckFile (char *aszFileName, FileLibFileCheckBuffer *aCheckBuf, int 
 {
 	FILE *hFile = fopen (aszFileName, "rb");
 	int   iStatus = FileLibStatus_FileNotFound;
+	int            ioStatus = 0;
+	size_t         ioLength = 0;
 
 	if (hFile) {
 		FileLibHeader  MyFileHeader;
 
-		fseek (hFile, 0, SEEK_SET);
-		fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
+		ioStatus = fseek (hFile, 0, SEEK_SET);
+		assert(ioStatus == 0);
+		ioLength = fread (&MyFileHeader, sizeof(MyFileHeader), 1, hFile);
 
 		// Check the signatures to determine if this file has been initialized properly.
 		// If signatures do not check out then we can not depend on file having proper management data.
 		if (MyFileHeader.ulSignature1 != FileLibFileSignature || MyFileHeader.ulSignature2 != FileLibFileSignature) {
 			printf (" File Signature is invalid.\n");
-			fclose (hFile);
+			ioStatus = fclose (hFile);
 			return -1;
 		}
 
 		FileLibRecordOffset nOffsetIndex = sizeof(MyFileHeader) + MyFileHeader.nHeaderSize;
 		FileLibIndex   tempbufIndex;
 
-		fseek (hFile, nOffsetIndex, SEEK_SET);
+		ioStatus = fseek (hFile, nOffsetIndex, SEEK_SET);
+		assert(ioStatus == 0);
 
 		for (int iCount = 0; iCount < MyFileHeader.nMaxRecords && iCount < nCheckBufCount; iCount++) {
-			fread (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
+			ioLength = fread (&tempbufIndex, MyFileHeader.nStoredIndexSize, 1, hFile);
 			if (tempbufIndex.nRecordBlockNumber > 0 && tempbufIndex.nRecordBlockNumber <= nCheckBufCount) {
 				if (aCheckBuf[tempbufIndex.nRecordBlockNumber - 1].nIndexNumber != 0) {
 					printf (" Index count %d record block number %d duplicated\n", iCount, tempbufIndex.nRecordBlockNumber);
@@ -825,7 +898,7 @@ int FileLibCheckFile (char *aszFileName, FileLibFileCheckBuffer *aCheckBuf, int 
 			}
 		}
 
-		fclose (hFile);
+		ioStatus = fclose (hFile);
 	}
 
 	return 0;
