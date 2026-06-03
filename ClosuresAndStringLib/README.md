@@ -16,3 +16,5 @@ This code is from an answer I posted for a StackOverflow question.
 
 See https://stackoverflow.com/questions/9804371/syntax-and-sample-usage-of-generic-in-c11/79725538#79725538
 
+See also https://stackoverflow.com/a/79735374/1466970 about using _Generic() with const 
+
