@@ -21,6 +21,9 @@
     <ClCompile Include="Source_01.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Source_02.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />

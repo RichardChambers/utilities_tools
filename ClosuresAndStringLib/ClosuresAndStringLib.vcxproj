@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClCompile Include="ClosuresAndStringLib.cpp" />
     <ClCompile Include="Source_01.c" />
+    <ClCompile Include="Source_02.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />

@@ -3,13 +3,12 @@
 
 #include <iostream>
 
-extern "C" int main_Source_01(void); 
+extern "C" int main_Source_01(void);    // closure test
+extern "C" int main_Source_02(void);    // string library test
 
 int main()
 {
-    std::cout << "Hello World!\n";
-
-    return main_Source_01();
+    return main_Source_02();
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
