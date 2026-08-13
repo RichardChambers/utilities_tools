@@ -7,6 +7,10 @@ according to the Reddit post.
 
 https://www.reddit.com/r/C_Programming/comments/11xdyr8/comment/jd2q0sn/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 
+### Windows API `CONTAINING_RECORD` macro
+
+For an explanation of the `CONTAINING_RECORD()` macro that is part of the Microsoft Windows API see the Microsoft learning documentation [CONTAINING_RECORD macro in ntdef.h](https://learn.microsoft.com/en-us/windows/win32/api/ntdef/nf-ntdef-containing_record). It is from the Windows 2000 days and is a bit different though it does the same thing.
+
 ## The Source Code
 
 The source code in this area provides a doubly linked list of users. The example shows adding users to the front as well as the back of the
